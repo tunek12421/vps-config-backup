@@ -154,9 +154,13 @@ function startNewReport() {
 }
 
 function cancelReport() {
-    if (confirm('¿Seguro que quieres cancelar este reporte?')) {
-        showView('viewHome');
-    }
+    showConfirmModal(
+        'Cancelar reporte',
+        '¿Seguro que quieres cancelar este reporte? Se perderán todos los datos ingresados.',
+        () => {
+            showView('viewHome');
+        }
+    );
 }
 
 // Photo Handling
@@ -362,4 +366,52 @@ function escapeHtml(unsafe) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+// Confirmation Modal
+function showConfirmModal(title, message, onConfirm) {
+    const modal = document.getElementById('confirmModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMessage = document.getElementById('modalMessage');
+    const btnConfirm = document.getElementById('modalConfirm');
+    const btnCancel = document.getElementById('modalCancel');
+
+    // Set content
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+
+    // Show modal
+    modal.style.display = 'flex';
+
+    // Handle confirm
+    const handleConfirm = () => {
+        modal.style.display = 'none';
+        if (onConfirm) onConfirm();
+        cleanup();
+    };
+
+    // Handle cancel
+    const handleCancel = () => {
+        modal.style.display = 'none';
+        cleanup();
+    };
+
+    // Handle click outside modal
+    const handleOverlayClick = (e) => {
+        if (e.target === modal) {
+            handleCancel();
+        }
+    };
+
+    // Cleanup function
+    const cleanup = () => {
+        btnConfirm.removeEventListener('click', handleConfirm);
+        btnCancel.removeEventListener('click', handleCancel);
+        modal.removeEventListener('click', handleOverlayClick);
+    };
+
+    // Add event listeners
+    btnConfirm.addEventListener('click', handleConfirm);
+    btnCancel.addEventListener('click', handleCancel);
+    modal.addEventListener('click', handleOverlayClick);
 }
