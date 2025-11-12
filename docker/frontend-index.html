@@ -31,81 +31,178 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Create Report Form -->
-            <section class="report-form" id="reportForm">
-                <h2>Nuevo Reporte</h2>
 
-                <!-- Camera Input -->
-                <div class="form-group">
-                    <label for="photoInput">Foto *</label>
-                    <div class="camera-container">
-                        <input type="file" id="photoInput" accept="image/*" capture="environment" required>
-                        <button type="button" id="cameraBtn" class="btn-camera">
-                            📷 Tomar Foto
-                        </button>
-                    </div>
-                    <div id="photoPreview" class="photo-preview" style="display: none;">
-                        <img id="previewImage" src="" alt="Preview">
-                        <button type="button" id="removePhoto" class="btn-remove">✕</button>
-                    </div>
+            <!-- Vista Home -->
+            <section class="view" id="viewHome">
+                <div class="welcome-section">
+                    <div class="welcome-icon">🛡️</div>
+                    <h2>Bienvenido</h2>
+                    <p>Ayuda a tu comunidad reportando incidentes</p>
                 </div>
 
-                <!-- Description -->
-                <div class="form-group">
-                    <label for="description">Descripción *</label>
+                <div class="action-buttons">
+                    <button type="button" id="btnStartReport" class="btn-primary-large">
+                        📝 Generar Reporte
+                    </button>
+                    <button type="button" id="btnLogin" class="btn-secondary-large">
+                        🔐 Iniciar Sesión
+                    </button>
+                </div>
+            </section>
+
+            <!-- Vista 1: Foto -->
+            <section class="view" id="viewPhoto" style="display: none;">
+                <div class="step-indicator">Paso 1 de 4</div>
+                <h2>Toma una foto</h2>
+                <p class="step-description">Captura una imagen del incidente</p>
+
+                <div class="photo-capture">
+                    <input type="file" id="photoInput" accept="image/*" capture="environment" style="display: none;">
+
+                    <div id="photoPreviewContainer" style="display: none;">
+                        <img id="previewImage" src="" alt="Preview" class="photo-preview-large">
+                        <button type="button" id="btnRetakePhoto" class="btn-retake">
+                            🔄 Tomar otra foto
+                        </button>
+                    </div>
+
+                    <button type="button" id="btnTakePhoto" class="btn-camera-large">
+                        📷 Tomar Foto
+                    </button>
+                </div>
+
+                <div class="navigation-buttons">
+                    <button type="button" id="btnCancelPhoto" class="btn-cancel">
+                        ✕ Cancelar
+                    </button>
+                    <button type="button" id="btnNextPhoto" class="btn-next" disabled>
+                        Siguiente →
+                    </button>
+                </div>
+            </section>
+
+            <!-- Vista 2: Descripción -->
+            <section class="view" id="viewDescription" style="display: none;">
+                <div class="step-indicator">Paso 2 de 4</div>
+                <h2>Describe el incidente</h2>
+                <p class="step-description">Proporciona detalles sobre lo que sucedió</p>
+
+                <div class="form-field">
                     <textarea
                         id="description"
-                        rows="4"
-                        placeholder="Describe el incidente..."
-                        required
+                        rows="6"
+                        placeholder="Describe el incidente con el mayor detalle posible..."
+                        maxlength="500"
                     ></textarea>
-                </div>
-
-                <!-- Location -->
-                <div class="form-group">
-                    <label>Ubicación *</label>
-
-                    <!-- Location method selector -->
-                    <div class="location-method-selector">
-                        <button type="button" id="autoLocationBtn" class="btn-location-method active">
-                            📍 GPS Automático
-                        </button>
-                        <button type="button" id="mapLocationBtn" class="btn-location-method">
-                            🗺️ Seleccionar en Mapa
-                        </button>
-                    </div>
-
-                    <!-- Auto Location -->
-                    <div id="autoLocationContainer" class="location-option-container">
-                        <button type="button" id="getLocationBtn" class="btn-location">
-                            📍 Obtener Ubicación Automática
-                        </button>
-                        <div id="locationStatus" class="location-status"></div>
-                    </div>
-
-                    <!-- Map Location -->
-                    <div id="mapLocationContainer" class="location-option-container" style="display: none;">
-                        <div class="map-instructions">
-                            Haz clic en el mapa para marcar la ubicación
-                        </div>
-                        <div id="map" class="location-map"></div>
-                        <div id="mapStatus" class="location-status"></div>
+                    <div class="char-counter">
+                        <span id="charCount">0</span>/500
                     </div>
                 </div>
 
-                <!-- Submit Button -->
-                <button type="button" id="submitBtn" class="btn-submit" disabled>
-                    Enviar Reporte
-                </button>
+                <div class="navigation-buttons">
+                    <button type="button" id="btnBackDescription" class="btn-back">
+                        ← Atrás
+                    </button>
+                    <button type="button" id="btnNextDescription" class="btn-next" disabled>
+                        Siguiente →
+                    </button>
+                </div>
+            </section>
 
-                <!-- Loading Indicator -->
+            <!-- Vista 3: Ubicación -->
+            <section class="view" id="viewLocation" style="display: none;">
+                <div class="step-indicator">Paso 3 de 4</div>
+                <h2>Ubicación del incidente</h2>
+                <p class="step-description">Marca dónde ocurrió el incidente</p>
+
+                <div class="location-methods">
+                    <button type="button" id="btnAutoLocation" class="btn-location-method active">
+                        📍 GPS Automático
+                    </button>
+                    <button type="button" id="btnMapLocation" class="btn-location-method">
+                        🗺️ Seleccionar en Mapa
+                    </button>
+                </div>
+
+                <!-- GPS Automático -->
+                <div id="autoLocationContainer" class="location-container">
+                    <button type="button" id="btnGetLocation" class="btn-get-location">
+                        📍 Obtener mi ubicación
+                    </button>
+                    <div id="locationStatus" class="location-status"></div>
+                </div>
+
+                <!-- Mapa -->
+                <div id="mapLocationContainer" class="location-container" style="display: none;">
+                    <div class="map-instructions">
+                        Haz clic en el mapa para marcar la ubicación exacta
+                    </div>
+                    <div id="map" class="location-map"></div>
+                    <div id="mapStatus" class="location-status"></div>
+                </div>
+
+                <div class="navigation-buttons">
+                    <button type="button" id="btnBackLocation" class="btn-back">
+                        ← Atrás
+                    </button>
+                    <button type="button" id="btnNextLocation" class="btn-next" disabled>
+                        Siguiente →
+                    </button>
+                </div>
+            </section>
+
+            <!-- Vista 4: Confirmación -->
+            <section class="view" id="viewConfirm" style="display: none;">
+                <div class="step-indicator">Paso 4 de 4</div>
+                <h2>Confirma tu reporte</h2>
+                <p class="step-description">Revisa la información antes de enviar</p>
+
+                <div class="summary-card">
+                    <div class="summary-section">
+                        <h3>📷 Foto</h3>
+                        <img id="confirmPhoto" src="" alt="Foto del reporte" class="summary-photo">
+                    </div>
+
+                    <div class="summary-section">
+                        <h3>📝 Descripción</h3>
+                        <p id="confirmDescription" class="summary-text"></p>
+                    </div>
+
+                    <div class="summary-section">
+                        <h3>📍 Ubicación</h3>
+                        <p id="confirmLocation" class="summary-text"></p>
+                    </div>
+                </div>
+
                 <div id="loadingIndicator" class="loading" style="display: none;">
                     <div class="spinner"></div>
                     <p>Enviando reporte...</p>
                 </div>
 
-                <!-- Message -->
-                <div id="message" class="message" style="display: none;"></div>
+                <div class="navigation-buttons">
+                    <button type="button" id="btnBackConfirm" class="btn-back">
+                        ← Atrás
+                    </button>
+                    <button type="button" id="btnSubmit" class="btn-submit-large">
+                        ✓ Enviar Reporte
+                    </button>
+                </div>
+            </section>
+
+            <!-- Vista 5: Éxito -->
+            <section class="view" id="viewSuccess" style="display: none;">
+                <div class="success-icon">✓</div>
+                <h2>¡Reporte enviado!</h2>
+                <p class="success-message">Tu reporte ha sido registrado exitosamente. Gracias por ayudar a tu comunidad.</p>
+
+                <div class="success-actions">
+                    <button type="button" id="btnNewReport" class="btn-primary-large">
+                        📝 Crear otro reporte
+                    </button>
+                    <button type="button" id="btnGoHome" class="btn-secondary">
+                        🏠 Volver al inicio
+                    </button>
+                </div>
             </section>
 
         </main>

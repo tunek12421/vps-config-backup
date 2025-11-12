@@ -4,75 +4,70 @@ const API_URL = window.location.hostname === 'localhost'
     : `${window.location.protocol}//${window.location.hostname}/api`;
 
 // State
-let selectedPhoto = null;
-let currentLocation = null;
+let reportData = {
+    photo: null,
+    photoURL: null,
+    description: '',
+    location: null
+};
+
 let map = null;
 let marker = null;
-let currentLocationMethod = 'auto'; // 'auto' or 'map'
+let currentLocationMethod = 'auto';
 
-// DOM Elements
-const photoInput = document.getElementById('photoInput');
-const cameraBtn = document.getElementById('cameraBtn');
-const photoPreview = document.getElementById('photoPreview');
-const previewImage = document.getElementById('previewImage');
-const removePhotoBtn = document.getElementById('removePhoto');
-const description = document.getElementById('description');
-
-// Location method buttons
-const autoLocationBtn = document.getElementById('autoLocationBtn');
-const mapLocationBtn = document.getElementById('mapLocationBtn');
-
-// Location containers
-const autoLocationContainer = document.getElementById('autoLocationContainer');
-const mapLocationContainer = document.getElementById('mapLocationContainer');
-
-// Location elements
-const getLocationBtn = document.getElementById('getLocationBtn');
-const locationStatus = document.getElementById('locationStatus');
-const mapStatus = document.getElementById('mapStatus');
-
-const submitBtn = document.getElementById('submitBtn');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const message = document.getElementById('message');
-
-// PWA Install
-let deferredPrompt;
-const installPrompt = document.getElementById('installPrompt');
-const installBtn = document.getElementById('installBtn');
-const dismissInstallBtn = document.getElementById('dismissInstall');
+// Current view tracking
+let currentView = 'viewHome';
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
-    checkValidation();
+    showView('viewHome');
 });
 
 function initializeApp() {
-    // Camera button
-    cameraBtn.addEventListener('click', () => {
-        photoInput.click();
+    // Home buttons
+    document.getElementById('btnStartReport').addEventListener('click', startNewReport);
+    document.getElementById('btnLogin').addEventListener('click', () => {
+        alert('Función de inicio de sesión próximamente');
     });
 
-    // Photo selection
-    photoInput.addEventListener('change', handlePhotoSelect);
+    // Photo view
+    document.getElementById('btnTakePhoto').addEventListener('click', () => {
+        document.getElementById('photoInput').click();
+    });
+    document.getElementById('photoInput').addEventListener('change', handlePhotoSelect);
+    document.getElementById('btnRetakePhoto').addEventListener('click', () => {
+        document.getElementById('photoInput').click();
+    });
+    document.getElementById('btnCancelPhoto').addEventListener('click', cancelReport);
+    document.getElementById('btnNextPhoto').addEventListener('click', () => showView('viewDescription'));
 
-    // Remove photo
-    removePhotoBtn.addEventListener('click', removePhoto);
+    // Description view
+    document.getElementById('description').addEventListener('input', handleDescriptionInput);
+    document.getElementById('btnBackDescription').addEventListener('click', () => showView('viewPhoto'));
+    document.getElementById('btnNextDescription').addEventListener('click', () => showView('viewLocation'));
 
-    // Location method selection
-    autoLocationBtn.addEventListener('click', () => switchLocationMethod('auto'));
-    mapLocationBtn.addEventListener('click', () => switchLocationMethod('map'));
+    // Location view
+    document.getElementById('btnAutoLocation').addEventListener('click', () => switchLocationMethod('auto'));
+    document.getElementById('btnMapLocation').addEventListener('click', () => switchLocationMethod('map'));
+    document.getElementById('btnGetLocation').addEventListener('click', getCurrentLocation);
+    document.getElementById('btnBackLocation').addEventListener('click', () => showView('viewDescription'));
+    document.getElementById('btnNextLocation').addEventListener('click', () => showView('viewConfirm'));
 
-    // Location button
-    getLocationBtn.addEventListener('click', getCurrentLocation);
+    // Confirm view
+    document.getElementById('btnBackConfirm').addEventListener('click', () => showView('viewLocation'));
+    document.getElementById('btnSubmit').addEventListener('click', handleSubmit);
 
-    // Description input
-    description.addEventListener('input', checkValidation);
-
-    // Submit button
-    submitBtn.addEventListener('click', handleSubmit);
+    // Success view
+    document.getElementById('btnNewReport').addEventListener('click', startNewReport);
+    document.getElementById('btnGoHome').addEventListener('click', () => showView('viewHome'));
 
     // PWA Install
+    let deferredPrompt;
+    const installPrompt = document.getElementById('installPrompt');
+    const installBtn = document.getElementById('installBtn');
+    const dismissInstallBtn = document.getElementById('dismissInstall');
+
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
@@ -96,352 +91,275 @@ function initializeApp() {
     // Register Service Worker
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-                console.log('Service Worker registered:', registration);
-            })
-            .catch(error => {
-                console.log('Service Worker registration failed:', error);
-            });
+            .then(reg => console.log('Service Worker registered'))
+            .catch(err => console.log('Service Worker registration failed:', err));
     }
 }
 
-// Photo handling
-function handlePhotoSelect(e) {
-    const file = e.target.files[0];
+// View Navigation
+function showView(viewId) {
+    // Hide all views
+    document.querySelectorAll('.view').forEach(view => {
+        view.style.display = 'none';
+    });
+
+    // Show target view
+    document.getElementById(viewId).style.display = 'block';
+    currentView = viewId;
+
+    // Special handling for certain views
+    if (viewId === 'viewConfirm') {
+        populateConfirmationView();
+    }
+
+    if (viewId === 'viewLocation' && !map) {
+        setTimeout(initializeMap, 100);
+    }
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+}
+
+function startNewReport() {
+    // Reset report data
+    reportData = {
+        photo: null,
+        photoURL: null,
+        description: '',
+        location: null
+    };
+
+    // Reset photo
+    document.getElementById('photoInput').value = '';
+    document.getElementById('photoPreviewContainer').style.display = 'none';
+    document.getElementById('btnTakePhoto').style.display = 'block';
+    document.getElementById('btnNextPhoto').disabled = true;
+
+    // Reset description
+    document.getElementById('description').value = '';
+    document.getElementById('charCount').textContent = '0';
+    document.getElementById('btnNextDescription').disabled = true;
+
+    // Reset location
+    document.getElementById('locationStatus').textContent = '';
+    document.getElementById('mapStatus').textContent = '';
+    document.getElementById('btnNextLocation').disabled = true;
+    if (marker && map) {
+        map.removeLayer(marker);
+        marker = null;
+    }
+
+    // Go to photo view
+    showView('viewPhoto');
+}
+
+function cancelReport() {
+    if (confirm('¿Seguro que quieres cancelar este reporte?')) {
+        showView('viewHome');
+    }
+}
+
+// Photo Handling
+function handlePhotoSelect(event) {
+    const file = event.target.files[0];
     if (!file) return;
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-        showMessage('Por favor selecciona una imagen válida', 'error');
+        alert('Por favor selecciona una imagen válida');
         return;
     }
 
-    // Validate file size (max 20MB)
-    if (file.size > 20 * 1024 * 1024) {
-        showMessage('La imagen no debe superar los 20MB', 'error');
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('La imagen es muy grande. Máximo 10MB.');
         return;
     }
 
+    reportData.photo = file;
+
+    // Show preview
     const reader = new FileReader();
-    reader.onload = (event) => {
-        selectedPhoto = event.target.result;
-        previewImage.src = selectedPhoto;
-        photoPreview.style.display = 'block';
-        cameraBtn.textContent = '📷 Cambiar Foto';
-        checkValidation();
+    reader.onload = (e) => {
+        reportData.photoURL = e.target.result;
+        document.getElementById('previewImage').src = e.target.result;
+        document.getElementById('photoPreviewContainer').style.display = 'block';
+        document.getElementById('btnTakePhoto').style.display = 'none';
+        document.getElementById('btnNextPhoto').disabled = false;
     };
     reader.readAsDataURL(file);
 }
 
-function removePhoto() {
-    selectedPhoto = null;
-    photoInput.value = '';
-    photoPreview.style.display = 'none';
-    previewImage.src = '';
-    cameraBtn.textContent = '📷 Tomar Foto';
-    checkValidation();
+// Description Handling
+function handleDescriptionInput(event) {
+    const text = event.target.value;
+    const charCount = text.length;
+
+    document.getElementById('charCount').textContent = charCount;
+    reportData.description = text;
+
+    // Enable next button if description has at least 10 characters
+    document.getElementById('btnNextDescription').disabled = charCount < 10;
 }
 
-// Location method switching
+// Location Handling
 function switchLocationMethod(method) {
     currentLocationMethod = method;
 
-    // Update button states
-    autoLocationBtn.classList.remove('active');
-    mapLocationBtn.classList.remove('active');
+    // Toggle button active states
+    document.getElementById('btnAutoLocation').classList.toggle('active', method === 'auto');
+    document.getElementById('btnMapLocation').classList.toggle('active', method === 'map');
 
-    // Hide all containers
-    autoLocationContainer.style.display = 'none';
-    mapLocationContainer.style.display = 'none';
+    // Toggle containers
+    document.getElementById('autoLocationContainer').style.display = method === 'auto' ? 'block' : 'none';
+    document.getElementById('mapLocationContainer').style.display = method === 'map' ? 'block' : 'none';
 
-    // Show selected container and update button
-    switch (method) {
-        case 'auto':
-            autoLocationBtn.classList.add('active');
-            autoLocationContainer.style.display = 'block';
-            break;
-        case 'map':
-            mapLocationBtn.classList.add('active');
-            mapLocationContainer.style.display = 'block';
-            initializeMap();
-            break;
+    // Initialize map if switching to map mode
+    if (method === 'map' && !map) {
+        initializeMap();
     }
 }
 
-// Initialize map
 function initializeMap() {
-    if (map) {
-        map.remove();
-    }
+    if (map) return;
 
-    // Default center (Cochabamba, Bolivia)
-    let defaultLat = -17.3895;
-    let defaultLng = -66.1568;
-    let defaultZoom = 14;
+    // Default to Cochabamba, Bolivia
+    const defaultLat = -17.3935;
+    const defaultLng = -66.1570;
 
-    // If we already have a location, use it
-    if (currentLocation) {
-        defaultLat = currentLocation.latitude;
-        defaultLng = currentLocation.longitude;
-        defaultZoom = 15;
-    }
+    map = L.map('map').setView([defaultLat, defaultLng], 13);
 
-    // Create map
-    map = L.map('map').setView([defaultLat, defaultLng], defaultZoom);
-
-    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
+        attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Add marker if location exists
-    if (currentLocation) {
-        marker = L.marker([currentLocation.latitude, currentLocation.longitude]).addTo(map);
-    }
-
     // Handle map clicks
-    map.on('click', function(e) {
-        // Remove old marker
+    map.on('click', (e) => {
         if (marker) {
             map.removeLayer(marker);
         }
 
-        // Add new marker
         marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
 
-        // Update location
-        currentLocation = {
+        reportData.location = {
             latitude: e.latlng.lat,
             longitude: e.latlng.lng
         };
 
-        // Show status
-        showMapStatus(
-            `✓ Ubicación seleccionada: ${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`,
-            'success'
-        );
-
-        checkValidation();
+        document.getElementById('mapStatus').innerHTML = `
+            ✓ Ubicación seleccionada<br>
+            📍 ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}
+        `;
+        document.getElementById('mapStatus').className = 'location-status success';
+        document.getElementById('btnNextLocation').disabled = false;
     });
-
-    // Try to get user's current location and center map (without requesting permission)
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const userLat = position.coords.latitude;
-                const userLng = position.coords.longitude;
-                map.setView([userLat, userLng], 15);
-            },
-            () => {
-                // Silently fail - map will stay at default location
-            },
-            { maximumAge: 60000, timeout: 5000 } // Use cached location if available
-        );
-    }
 }
 
-function showMapStatus(text, type) {
-    mapStatus.textContent = text;
-    mapStatus.className = `location-status ${type}`;
-}
+function getCurrentLocation() {
+    const statusEl = document.getElementById('locationStatus');
 
-// Location handling
-async function getCurrentLocation() {
     if (!navigator.geolocation) {
-        showLocationStatus('La geolocalización no está disponible en este navegador', 'error');
+        statusEl.textContent = '❌ Tu navegador no soporta geolocalización';
+        statusEl.className = 'location-status error';
         return;
     }
 
-    getLocationBtn.disabled = true;
-    getLocationBtn.textContent = '📍 Obteniendo ubicación...';
+    statusEl.textContent = '📍 Obteniendo ubicación...';
+    statusEl.className = 'location-status';
 
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
-        });
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            reportData.location = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+            };
 
-        currentLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-        };
+            statusEl.innerHTML = `
+                ✓ Ubicación obtenida<br>
+                📍 ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}
+            `;
+            statusEl.className = 'location-status success';
+            document.getElementById('btnNextLocation').disabled = false;
+        },
+        (error) => {
+            let errorMessage = '❌ No se pudo obtener tu ubicación. ';
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage += 'Permiso denegado.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage += 'Posición no disponible.';
+                    break;
+                case error.TIMEOUT:
+                    errorMessage += 'Tiempo de espera agotado.';
+                    break;
+            }
 
-        showLocationStatus(
-            `✓ Ubicación obtenida: ${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`,
-            'success'
-        );
-
-        checkValidation();
-    } catch (error) {
-        let errorMessage = 'Error al obtener la ubicación';
-
-        switch (error.code) {
-            case error.PERMISSION_DENIED:
-                errorMessage = 'Permiso denegado. En iOS: Ajustes > Safari > Ubicación > Permitir. O usa el mapa.';
-                break;
-            case error.POSITION_UNAVAILABLE:
-                errorMessage = 'Ubicación no disponible. Usa el mapa para seleccionar manualmente.';
-                break;
-            case error.TIMEOUT:
-                errorMessage = 'Tiempo agotado. Intenta con el mapa.';
-                break;
+            statusEl.textContent = errorMessage;
+            statusEl.className = 'location-status error';
         }
-
-        showLocationStatus(errorMessage, 'error');
-        currentLocation = null;
-        checkValidation();
-    } finally {
-        getLocationBtn.disabled = false;
-        getLocationBtn.textContent = '📍 Obtener Ubicación Automática';
-    }
+    );
 }
 
-function showLocationStatus(text, type) {
-    locationStatus.textContent = text;
-    locationStatus.className = `location-status ${type}`;
+// Confirmation View
+function populateConfirmationView() {
+    // Photo
+    document.getElementById('confirmPhoto').src = reportData.photoURL;
+
+    // Description
+    document.getElementById('confirmDescription').textContent = reportData.description;
+
+    // Location
+    const loc = reportData.location;
+    document.getElementById('confirmLocation').innerHTML = `
+        Latitud: ${loc.latitude.toFixed(6)}<br>
+        Longitud: ${loc.longitude.toFixed(6)}
+    `;
 }
 
-// Validation
-function checkValidation() {
-    const hasPhoto = selectedPhoto !== null;
-    const hasDescription = description.value.trim().length > 0;
-    const hasLocation = currentLocation !== null;
-
-    submitBtn.disabled = !(hasPhoto && hasDescription && hasLocation);
-}
-
-// Submit
+// Submit Report
 async function handleSubmit() {
-    if (!selectedPhoto || !description.value.trim() || !currentLocation) {
-        showMessage('Por favor completa todos los campos requeridos', 'error');
-        return;
-    }
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const submitBtn = document.getElementById('btnSubmit');
 
-    // Validate location has required properties (iOS Safari compatibility)
-    if (!currentLocation.latitude || !currentLocation.longitude) {
-        showMessage('Error: Ubicación inválida. Por favor, obtén la ubicación nuevamente.', 'error');
-        return;
-    }
-
-    // Show loading
-    submitBtn.disabled = true;
     loadingIndicator.style.display = 'block';
-    message.style.display = 'none';
+    submitBtn.disabled = true;
 
     try {
-        // Create report data with explicit type checking for iOS Safari
-        const reportData = {
-            description: String(description.value.trim()),
-            latitude: Number(currentLocation.latitude),
-            longitude: Number(currentLocation.longitude),
-            photo: String(selectedPhoto)
-        };
+        const formData = new FormData();
+        formData.append('photo', reportData.photo);
+        formData.append('description', reportData.description);
+        formData.append('latitude', reportData.location.latitude);
+        formData.append('longitude', reportData.location.longitude);
 
         const response = await fetch(`${API_URL}/reports`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(reportData)
+            body: formData
         });
 
         if (!response.ok) {
-            // Handle different error status codes
-            let errorMessage = 'Error al enviar el reporte';
-
-            if (response.status === 413) {
-                errorMessage = 'La imagen es demasiado grande. Por favor, intenta con una imagen más pequeña.';
-            } else if (response.status >= 500) {
-                errorMessage = 'Error del servidor. Por favor, intenta nuevamente.';
-            } else {
-                try {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const error = await response.json();
-                        errorMessage = error.error || errorMessage;
-                    } else {
-                        // Server returned HTML or other non-JSON response
-                        errorMessage = `Error del servidor (${response.status}). Por favor, intenta nuevamente.`;
-                    }
-                } catch (e) {
-                    // Failed to parse error response
-                    errorMessage = `Error del servidor (${response.status}). Por favor, intenta nuevamente.`;
-                }
-            }
-
-            throw new Error(errorMessage);
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al enviar el reporte');
         }
 
-        const result = await response.json();
-        console.log('Report created:', result);
-
-        showMessage('✓ Reporte enviado exitosamente', 'success');
-
-        // Reset form
-        resetForm();
-
-        // Reload reports
-        setTimeout(() => {
-            loadReports();
-        }, 1000);
+        // Success
+        showView('viewSuccess');
 
     } catch (error) {
         console.error('Error submitting report:', error);
-        showMessage(`Error: ${error.message}`, 'error');
+        alert(`Error al enviar el reporte: ${error.message}`);
+        submitBtn.disabled = false;
     } finally {
         loadingIndicator.style.display = 'none';
-        submitBtn.disabled = false;
     }
-}
-
-function resetForm() {
-    // Reset photo
-    removePhoto();
-
-    // Reset description
-    description.value = '';
-
-    // Reset location
-    currentLocation = null;
-    locationStatus.textContent = '';
-    locationStatus.className = 'location-status';
-    mapStatus.textContent = '';
-    mapStatus.className = 'location-status';
-
-    // Reset validation
-    checkValidation();
 }
 
 // Utilities
-function showMessage(text, type) {
-    message.textContent = text;
-    message.className = `message ${type}`;
-    message.style.display = 'block';
-
-    // Auto-hide success messages
-    if (type === 'success') {
-        setTimeout(() => {
-            message.style.display = 'none';
-        }, 5000);
-    }
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Handle online/offline status
-window.addEventListener('online', () => {
-    showMessage('✓ Conexión restaurada', 'success');
-    loadReports();
-});
-
-window.addEventListener('offline', () => {
-    showMessage('⚠️ Sin conexión a internet', 'error');
-});
