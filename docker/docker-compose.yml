@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # NGINX REVERSE PROXY
+  # ========================================
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: sumate-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - frontend
+      - admin-frontend
+      - landing
+      - backend
+      - admin-backend
+    networks:
+      - sumate-network
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+
+  # ========================================
+  # DATABASE
+  # ========================================
+  db:
+    image: postgres:15-alpine
+    container_name: sumate-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      POSTGRES_DB: ${POSTGRES_DB:-sumate}
+    # SECURITY: PostgreSQL port NOT exposed to internet
+    # Only accessible from other containers in the same network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./backend/database/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sumate-network
+
+  # ========================================
+  # BACKEND SERVICES
+  # ========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sumate-backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      DB_NAME: ${POSTGRES_DB:-sumate}
+      PORT: 8080
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      UPLOADS_DIR: /root/uploads
+      ENV: ${ENV:-production}
+    # SECURITY: No external ports exposed - only accessible via nginx
+    volumes:
+      - uploads_data:/root/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sumate-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  admin-backend:
+    build:
+      context: ./admin/backend
+      dockerfile: Dockerfile
+    container_name: sumate-admin-backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      DB_NAME: ${POSTGRES_DB:-sumate}
+      PORT: 8081
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-CHANGE_ADMIN_PASSWORD}
+      ENV: ${ENV:-production}
+    # SECURITY: No external ports exposed - only accessible via nginx
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sumate-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # FRONTEND SERVICES
+  # ========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sumate-frontend
+    restart: unless-stopped
+    # SECURITY: No external ports exposed - only accessible via nginx
+    depends_on:
+      - backend
+    networks:
+      - sumate-network
+
+  admin-frontend:
+    build:
+      context: ./admin/frontend
+      dockerfile: Dockerfile
+    container_name: sumate-admin-frontend
+    restart: unless-stopped
+    # SECURITY: No external ports exposed - only accessible via nginx
+    depends_on:
+      - admin-backend
+    networks:
+      - sumate-network
+
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+    container_name: sumate-landing
+    restart: unless-stopped
+    # SECURITY: No external ports exposed - only accessible via nginx
+    networks:
+      - sumate-network
+
+# ========================================
+# VOLUMES
+# ========================================
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+# ========================================
+# NETWORKS
+# ========================================
+networks:
+  sumate-network:
+    driver: bridge

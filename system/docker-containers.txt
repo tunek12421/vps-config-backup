@@ -1,0 +1,8 @@
+NAMES                   IMAGE                  STATUS                 PORTS
+sumate-nginx            sumak-nginx            Up 3 weeks             80/tcp, 443/tcp, 0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+sumate-frontend         sumak-frontend         Up 3 weeks             80/tcp
+sumate-admin-frontend   sumak-admin-frontend   Up 3 weeks             80/tcp
+sumate-backend          sumak-backend          Up 3 weeks (healthy)   8080/tcp
+sumate-admin-backend    sumak-admin-backend    Up 3 weeks (healthy)   8081/tcp
+sumate-landing          sumak-landing          Up 3 weeks             80/tcp
+sumate-db               postgres:15-alpine     Up 3 weeks (healthy)   5432/tcp
